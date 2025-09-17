@@ -83,6 +83,301 @@ Public Class MainForm
     ' --- Constantes ---
     Private Const LOCAL_VERSION_FILE As String = "version.local"
 
+    ' --- Métodos Auxiliares para Refatoração ---
+
+    ''' <summary>
+    ''' Executa uma operação assíncrona com tratamento de erro padronizado
+    ''' </summary>
+    Private Async Function ExecutarOperacaoAsync(operation As Func(Of Task),
+                                                successMessage As String,
+                                                errorMessage As String,
+                                                Optional button As Button = Nothing) As Task(Of Boolean)
+        Try
+            If button IsNot Nothing Then button.Enabled = False
+            UpdateStatus($"{errorMessage.Replace("Erro na ", "Executando ").Replace("Erro ao ", "Executando ")}...")
+
+            Await operation()
+
+            UpdateStatus(successMessage)
+            ShowSuccessMessage(successMessage)
+            Return True
+
+        Catch ex As Exception
+            UpdateStatus(errorMessage)
+            ShowErrorMessage($"{errorMessage}: {ex.Message}")
+            Return False
+        Finally
+            If button IsNot Nothing Then
+                If Me.InvokeRequired Then
+                    Me.Invoke(Sub() button.Enabled = True)
+                Else
+                    button.Enabled = True
+                End If
+            End If
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Executa uma operação síncrona com tratamento de erro padronizado
+    ''' </summary>
+    Private Function ExecutarOperacao(operation As Action,
+                                    successMessage As String,
+                                    errorMessage As String,
+                                    Optional button As Button = Nothing) As Boolean
+        Try
+            If button IsNot Nothing Then button.Enabled = False
+            UpdateStatus($"{errorMessage.Replace("Erro na ", "Executando ").Replace("Erro ao ", "Executando ")}...")
+
+            operation()
+
+            UpdateStatus(successMessage)
+            ShowSuccessMessage(successMessage)
+            Return True
+
+        Catch ex As Exception
+            UpdateStatus(errorMessage)
+            ShowErrorMessage($"{errorMessage}: {ex.Message}")
+            Return False
+        Finally
+            If button IsNot Nothing Then
+                If Me.InvokeRequired Then
+                    Me.Invoke(Sub() button.Enabled = True)
+                Else
+                    button.Enabled = True
+                End If
+            End If
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Mostra mensagem de sucesso
+    ''' </summary>
+    Private Sub ShowSuccessMessage(message As String)
+        If Me.InvokeRequired Then
+            Me.Invoke(Sub() MessageBox.Show(message, "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information))
+        Else
+            MessageBox.Show(message, "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Mostra mensagem de erro
+    ''' </summary>
+    Private Sub ShowErrorMessage(message As String)
+        If Me.InvokeRequired Then
+            Me.Invoke(Sub() MessageBox.Show(message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error))
+        Else
+            MessageBox.Show(message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Mostra mensagem de aviso
+    ''' </summary>
+    Private Sub ShowWarningMessage(message As String)
+        If Me.InvokeRequired Then
+            Me.Invoke(Sub() MessageBox.Show(message, "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning))
+        Else
+            MessageBox.Show(message, "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Atualiza a informação da última sincronização no txtLog
+    ''' </summary>
+    Private Sub AtualizarInfoUltimaSincronizacao()
+        Try
+            Dim infoSincronizacao As String = ObterInfoUltimaSincronizacao()
+            
+            If Me.InvokeRequired Then
+                Me.Invoke(Sub() MostrarInfoSincronizacao(infoSincronizacao))
+            Else
+                MostrarInfoSincronizacao(infoSincronizacao)
+            End If
+            
+        Catch ex As Exception
+            Console.WriteLine($"Erro ao atualizar info de sincronização: {ex.Message}")
+        End Try
+    End Sub
+    
+    ''' <summary>
+    ''' Mostra informações de sincronização no txtLog
+    ''' </summary>
+    Private Sub MostrarInfoSincronizacao(info As String)
+        Try
+            ' Mostrar informações de sincronização no txtLog
+            Console.WriteLine(info)
+
+        Catch ex As Exception
+            Console.WriteLine($"Erro ao mostrar info de sincronização: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Obtém informações da última sincronização
+    ''' </summary>
+    Private Function ObterInfoUltimaSincronizacao() As String
+        Try
+            ' Verificar se o banco existe
+            If Not File.Exists(Path.Combine(Application.StartupPath, "data", "database.sqlite")) Then
+                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                       "❌ Banco de dados não encontrado" & Environment.NewLine &
+                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
+                       "🕐 Última sincronização: N/A"
+            End If
+
+            ' Conectar ao banco para verificar dados
+            Dim dbManager As New DatabaseManager()
+            Dim conexaoResult = dbManager.Conectar()
+
+            If Not conexaoResult.Success Then
+                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                       "❌ Erro ao conectar ao banco" & Environment.NewLine &
+                       "💡 Verifique se o sistema foi instalado corretamente" & Environment.NewLine &
+                       "🕐 Última sincronização: N/A"
+            End If
+
+            ' Verificar se há dados na tabela incidents
+            Dim resultadoContagem = dbManager.ExecutarQuery("SELECT COUNT(*) as total FROM incidents")
+            If Not resultadoContagem.Success Then
+                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                       "❌ Erro ao verificar dados do banco" & Environment.NewLine &
+                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
+                       "🕐 Última sincronização: N/A"
+            End If
+
+            Dim totalIncidentes = Convert.ToInt32(resultadoContagem.Registros(0)("total"))
+
+            If totalIncidentes = 0 Then
+                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                       "📋 Banco de dados vazio (0 incidentes)" & Environment.NewLine &
+                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
+                       "🕐 Última sincronização: N/A"
+            End If
+
+            ' Buscar data da última sincronização (tabela de controle)
+            Dim resultadoSync = dbManager.ExecutarQuery("SELECT MAX(last_sync_date) as ultima_sync FROM sync_control")
+            Dim ultimaSincronizacao As String = "N/A"
+
+            If resultadoSync.Success AndAlso resultadoSync.Registros.Count > 0 Then
+                Dim ultimaSync = resultadoSync.Registros(0)("ultima_sync")
+                If ultimaSync IsNot Nothing AndAlso Not IsDBNull(ultimaSync) Then
+                    ultimaSincronizacao = DateTime.Parse(ultimaSync.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
+                End If
+            End If
+
+            ' Se não há controle de sync, buscar data do último incidente
+            If ultimaSincronizacao = "N/A" Then
+                Dim resultadoUltimo = dbManager.ExecutarQuery("SELECT MAX(DATA_CRIACAO) as ultima_data FROM incidents")
+                If resultadoUltimo.Success AndAlso resultadoUltimo.Registros.Count > 0 Then
+                    Dim ultimaData = resultadoUltimo.Registros(0)("ultima_data")
+                    If ultimaData IsNot Nothing AndAlso Not IsDBNull(ultimaData) Then
+                        ultimaSincronizacao = DateTime.Parse(ultimaData.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
+                    End If
+                End If
+            End If
+
+            ' Verificar status dos serviços
+            Dim statusBackend = "🔴 Offline"
+            Dim statusFrontend = "🔴 Offline"
+
+            Try
+                If backendApiManager IsNot Nothing AndAlso backendApiManager.IsRunning Then
+                    statusBackend = "🟢 Online"
+                End If
+            Catch
+            End Try
+
+            Try
+                If frontendServer IsNot Nothing AndAlso frontendServer.IsServerRunning Then
+                    statusFrontend = "🟢 Online"
+                End If
+            Catch
+            End Try
+
+            Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                   $"📋 Total de incidentes: {totalIncidentes:N0}" & Environment.NewLine &
+                   $"🖥️ Backend: {statusBackend}" & Environment.NewLine &
+                   $"🌐 Frontend: {statusFrontend}" & Environment.NewLine &
+                   $"🕐 Última sincronização: {ultimaSincronizacao}" & Environment.NewLine &
+                   $"📅 Atualizado em: {DateTime.Now:dd/MM/yyyy HH:mm:ss}"
+
+        Catch ex As Exception
+            Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                   "❌ Erro ao verificar status" & Environment.NewLine &
+                   $"💡 Detalhes: {ex.Message}" & Environment.NewLine &
+                   "🕐 Última sincronização: N/A"
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Executa a sequência completa de inicialização
+    ''' </summary>
+    Private Async Function ExecutarSequenciaInicializacao() As Task(Of Boolean)
+        Try
+            UpdateProgress(0, "Iniciando sequência de inicialização...")
+            Await Task.Delay(500)
+
+            ' ETAPA 1: Verificar Atualizações (0% -> 20%)
+            Console.WriteLine("📋 ETAPA 1/3: Verificando atualizações...")
+            UpdateProgress(5, "📋 Verificando atualizações disponíveis...")
+            Dim updateSuccess = Await ExecutarVerificacaoAtualizacoes()
+            If Not updateSuccess Then
+                Console.WriteLine("⚠️ Falha na verificação de atualizações - continuando mesmo assim...")
+                UpdateProgress(20, "⚠️ Verificação de atualizações com problemas - continuando...")
+            Else
+                UpdateProgress(20, "✅ Verificação de atualizações concluída")
+            End If
+            Await Task.Delay(500)
+            Console.WriteLine()
+
+            ' ETAPA 2: Iniciar Sistema (20% -> 80%)
+            Console.WriteLine("🚀 ETAPA 2/3: Iniciando sistema...")
+            UpdateProgress(25, "🚀 Iniciando sistema SUAT-IA...")
+            Dim startupSuccess = Await ExecutarInicializacaoSistema()
+            If Not startupSuccess Then
+                Console.WriteLine("❌ Falha na inicialização do sistema - abortando sequência")
+                ResetProgress()
+                UpdateStatus("❌ Falha na inicialização do sistema")
+                ShowErrorMessage("Falha na inicialização do sistema. Verifique os logs para mais detalhes.")
+                Return False
+            End If
+            UpdateProgress(80, "✅ Sistema iniciado com sucesso")
+            Await Task.Delay(500)
+            Console.WriteLine()
+
+            ' ETAPA 3: Sincronizar Dados (80% -> 100%)
+            Console.WriteLine("🔄 ETAPA 3/3: Sincronizando dados...")
+            UpdateProgress(85, "🔄 Sincronizando dados...")
+            Dim syncSuccess = Await ExecutarSincronizacaoDados()
+            If Not syncSuccess Then
+                Console.WriteLine("⚠️ Falha na sincronização de dados - sistema iniciado mas sem sincronização")
+                UpdateProgress(95, "⚠️ Sistema iniciado - falha na sincronização")
+                Await Task.Delay(2000)
+                ResetProgress()
+                UpdateStatus("⚠️ Sistema iniciado - falha na sincronização")
+                ShowWarningMessage("Sistema iniciado com sucesso, mas houve falha na sincronização de dados.")
+                Return False
+            End If
+
+            Console.WriteLine("✅ Sequência completa finalizada com sucesso!")
+            UpdateProgress(100, "✅ Sistema iniciado e sincronizado com sucesso!")
+            Console.WriteLine()
+            Console.WriteLine("🎯 ======================================")
+            Console.WriteLine("🎯    MENU INICIAR CONCLUÍDO")
+            Console.WriteLine("🎯 ======================================")
+
+            Return True
+
+        Catch ex As Exception
+            Console.WriteLine($"❌ Erro na sequência de inicialização: {ex.Message}")
+            ResetProgress()
+            UpdateStatus("❌ Erro na sequência de inicialização")
+            ShowErrorMessage($"Erro na sequência de inicialização: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
     ''' <summary>
     ''' Construtor do formulário
     ''' </summary>
@@ -822,11 +1117,15 @@ Public Class MainForm
         '
         'StatusStrip1
         '
-        Me.StatusStrip1.ImageScalingSize = New System.Drawing.Size(28, 28)
+        Me.StatusStrip1.ImageScalingSize = New System.Drawing.Size(16, 16)
         Me.StatusStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ts1, Me.ts2, Me.ts3, Me.ts4, Me.tsp1})
         Me.StatusStrip1.Location = New System.Drawing.Point(0, 617)
         Me.StatusStrip1.Name = "StatusStrip1"
-        Me.StatusStrip1.Size = New System.Drawing.Size(1165, 39)
+        Me.StatusStrip1.AutoSize = False
+        Me.StatusStrip1.SizingGrip = False
+        Me.StatusStrip1.MinimumSize = New System.Drawing.Size(0, 38)
+        Me.StatusStrip1.MaximumSize = New System.Drawing.Size(0, 38)
+        Me.StatusStrip1.Size = New System.Drawing.Size(1165, 38)
         Me.StatusStrip1.TabIndex = 28
         Me.StatusStrip1.Text = "StatusStrip1"
         '
@@ -863,6 +1162,7 @@ Public Class MainForm
         '
         'MainForm
         '
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None
         Me.ClientSize = New System.Drawing.Size(1165, 656)
         Me.Controls.Add(Me.StatusStrip1)
         Me.Controls.Add(Me.toolStripPrincipal)
@@ -1389,29 +1689,60 @@ Public Class MainForm
     ''' Inicializa os gerenciadores de lógica
     ''' </summary>
     Private Sub InitializeManagers()
+        ' Inicializar managers básicos
         updateManager = New UpdateManager()
         portManager = New PortManager()
         sincronizador = New SincronizadorDados()
 
-        ' Inicializar servidor frontend
-        Dim frontendBuildPath = Path.Combine(Application.StartupPath, "frontend", "build")
-        frontendServer = New FrontendHttpServer(frontendBuildPath, 8080)
-
-        ' Inicializar backend API manager
-        Dim backendExePath = Path.Combine(Application.StartupPath, "backend", "suat-backend.exe")
-        backendApiManager = New BackendApiManager(backendExePath)
+        ' Inicializar servidores
+        InitializeServers()
 
         ' Conectar eventos
-        AddHandler updateManager.ProgressChanged, AddressOf OnUpdateProgress
-        AddHandler portManager.PortStatusChanged, AddressOf OnPortStatusChanged
-        AddHandler frontendServer.StatusChanged, AddressOf OnFrontendStatusChanged
-        AddHandler frontendServer.ServerStarted, AddressOf OnFrontendServerStarted
-        AddHandler frontendServer.ServerStopped, AddressOf OnFrontendServerStopped
-        AddHandler frontendServer.RequestReceived, AddressOf OnFrontendRequestReceived
-        AddHandler backendApiManager.StatusChanged, AddressOf OnBackendStatusChanged
-        AddHandler backendApiManager.ServerStarted, AddressOf OnBackendServerStarted
-        AddHandler backendApiManager.ServerStopped, AddressOf OnBackendServerStopped
-        AddHandler backendApiManager.HealthCheckResult, AddressOf OnBackendHealthCheck
+        ConnectEventHandlers()
+    End Sub
+
+    ''' <summary>
+    ''' Inicializa os servidores (Frontend e Backend)
+    ''' </summary>
+    Private Sub InitializeServers()
+        Try
+            ' Inicializar servidor frontend
+            Dim frontendBuildPath = Path.Combine(Application.StartupPath, "frontend", "build")
+            frontendServer = New FrontendHttpServer(frontendBuildPath, 8080)
+
+            ' Inicializar backend API manager
+            Dim backendExePath = Path.Combine(Application.StartupPath, "backend", "suat-backend.exe")
+            backendApiManager = New BackendApiManager(backendExePath)
+        Catch ex As Exception
+            Console.WriteLine($"Erro ao inicializar servidores: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Conecta os event handlers dos managers
+    ''' </summary>
+    Private Sub ConnectEventHandlers()
+        Try
+            ' Eventos do UpdateManager
+            AddHandler updateManager.ProgressChanged, AddressOf OnUpdateProgress
+
+            ' Eventos do PortManager
+            AddHandler portManager.PortStatusChanged, AddressOf OnPortStatusChanged
+
+            ' Eventos do FrontendServer
+            AddHandler frontendServer.StatusChanged, AddressOf OnFrontendStatusChanged
+            AddHandler frontendServer.ServerStarted, AddressOf OnFrontendServerStarted
+            AddHandler frontendServer.ServerStopped, AddressOf OnFrontendServerStopped
+            AddHandler frontendServer.RequestReceived, AddressOf OnFrontendRequestReceived
+
+            ' Eventos do BackendApiManager
+            AddHandler backendApiManager.StatusChanged, AddressOf OnBackendStatusChanged
+            AddHandler backendApiManager.ServerStarted, AddressOf OnBackendServerStarted
+            AddHandler backendApiManager.ServerStopped, AddressOf OnBackendServerStopped
+            AddHandler backendApiManager.HealthCheckResult, AddressOf OnBackendHealthCheck
+        Catch ex As Exception
+            Console.WriteLine($"Erro ao conectar event handlers: {ex.Message}")
+        End Try
     End Sub
 
     ''' <summary>
@@ -1649,34 +1980,17 @@ Public Class MainForm
     ''' <summary>
     ''' Evento de clique no botão Carga Inicial
     ''' </summary>
-    Private Sub btnCargaInicial_Click(sender As Object, e As EventArgs) Handles btnCargaInicial.Click
-        Try
-            btnCargaInicial.Enabled = False
-            UpdateStatus("Executando carga inicial...")
+    Private Async Sub btnCargaInicial_Click(sender As Object, e As EventArgs) Handles btnCargaInicial.Click
+        Dim sucesso = Await ExecutarOperacaoAsync(
+            Function() Task.Run(Sub() sincronizador.RealizarCargaInicial()),
+            "Carga inicial concluída!",
+            "Erro na carga inicial",
+            btnCargaInicial)
 
-            ' Executar em thread separada para não bloquear a UI
-            Task.Run(Sub()
-                         Try
-                             sincronizador.RealizarCargaInicial()
-                             Me.Invoke(Sub()
-                                           UpdateStatus("Carga inicial concluída!")
-                                           MessageBox.Show("Carga inicial concluída com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                                       End Sub)
-                         Catch ex As Exception
-                             Me.Invoke(Sub()
-                                           UpdateStatus("Erro na carga inicial")
-                                           MessageBox.Show($"Erro na carga inicial: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-                                       End Sub)
-                         Finally
-                             Me.Invoke(Sub() btnCargaInicial.Enabled = True)
-                         End Try
-                     End Sub)
-
-        Catch ex As Exception
-            MessageBox.Show($"Erro: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            btnCargaInicial.Enabled = True
-            UpdateStatus("Sistema pronto")
-        End Try
+        ' Atualizar informações de sincronização após carga
+        If sucesso Then
+            AtualizarInfoUltimaSincronizacao()
+        End If
     End Sub
 
     ''' <summary>
@@ -1715,34 +2029,17 @@ Public Class MainForm
     ''' <summary>
     ''' Evento de clique no botão Sincronização Inteligente
     ''' </summary>
-    Private Sub btnSincronizacaoInteligente_Click(sender As Object, e As EventArgs) Handles btnSincronizacaoInteligente.Click
-        Try
-            btnSincronizacaoInteligente.Enabled = False
-            UpdateStatus("Executando sincronização inteligente...")
+    Private Async Sub btnSincronizacaoInteligente_Click(sender As Object, e As EventArgs) Handles btnSincronizacaoInteligente.Click
+        Dim sucesso = Await ExecutarOperacaoAsync(
+            Function() Task.Run(Sub() sincronizador.ExecutarSincronizacaoInteligente()),
+            "Sincronização inteligente concluída!",
+            "Erro na sincronização inteligente",
+            btnSincronizacaoInteligente)
 
-            ' Executar em thread separada para não bloquear a UI
-            Task.Run(Sub()
-                         Try
-                             sincronizador.ExecutarSincronizacaoInteligente()
-                             Me.Invoke(Sub()
-                                           UpdateStatus("Sincronização inteligente concluída!")
-                                           MessageBox.Show("Sincronização inteligente concluída com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                                       End Sub)
-                         Catch ex As Exception
-                             Me.Invoke(Sub()
-                                           UpdateStatus("Erro na sincronização inteligente")
-                                           MessageBox.Show($"Erro na sincronização inteligente: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-                                       End Sub)
-                         Finally
-                             Me.Invoke(Sub() btnSincronizacaoInteligente.Enabled = True)
-                         End Try
-                     End Sub)
-
-        Catch ex As Exception
-            MessageBox.Show($"Erro: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            btnSincronizacaoInteligente.Enabled = True
-            UpdateStatus("Sistema pronto")
-        End Try
+        ' Atualizar informações de sincronização após sincronização
+        If sucesso Then
+            AtualizarInfoUltimaSincronizacao()
+        End If
     End Sub
 
     ''' <summary>
@@ -1812,27 +2109,28 @@ Public Class MainForm
     ''' Evento de clique no botão Criar Versão Teste
     ''' </summary>
     Private Sub btnCriarVersaoTeste_Click(sender As Object, e As EventArgs) Handles btnCriarVersaoTeste.Click
-        Try
-            updateManager.CriarArquivoVersaoTeste()
-            MessageBox.Show("Arquivo de versão de teste criado com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
-        Catch ex As Exception
-            MessageBox.Show($"Erro ao criar arquivo de versão: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
+        ExecutarOperacao(
+            Sub() updateManager.CriarArquivoVersaoTeste(),
+            "Arquivo de versão de teste criado com sucesso!",
+            "Erro ao criar arquivo de versão")
     End Sub
 
     ''' <summary>
     ''' Aplica uma atualização
     ''' </summary>
-    Private Async Function AplicarAtualizacao(versionInfo As VersionInfo) As Task
+    Private Async Function AplicarAtualizacao(versionInfo As VersionInfo) As Task(Of Boolean)
         Try
             Dim result = Await updateManager.AplicarAtualizacao(versionInfo)
             If result.Success Then
-                MessageBox.Show("Atualização aplicada com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                ShowSuccessMessage("Atualização aplicada com sucesso!")
+                Return True
             Else
-                MessageBox.Show($"Erro na atualização: {result.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                ShowErrorMessage($"Erro na atualização: {result.Message}")
+                Return False
             End If
         Catch ex As Exception
-            MessageBox.Show($"Erro ao aplicar atualização: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ShowErrorMessage($"Erro ao aplicar atualização: {ex.Message}")
+            Return False
         End Try
     End Function
 
@@ -1952,6 +2250,11 @@ Public Class MainForm
     ''' Evento de carregamento do formulário
     ''' </summary>
     Private Async Sub MainForm_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' Fixar altura do StatusStrip para manter o tamanho do design
+        Me.StatusStrip1.AutoSize = False
+        Me.StatusStrip1.Height = 38
+        Me.StatusStrip1.Padding = New Padding(0, 0, 0, 0)
+
         Console.WriteLine("========================================")
         Console.WriteLine("    SUAT-IA - Sistema de Integração")
         Console.WriteLine("    .NET Framework 4.7 - WinForms")
@@ -1979,6 +2282,10 @@ Public Class MainForm
         ' FASE 2: Detectar status atual dos serviços e atualizar a interface
         Console.WriteLine("🔍 FASE 2: Detectando status após limpeza...")
         Await DetectarStatusServicosAsync()
+
+        ' FASE 3: Atualizar informações de sincronização
+        Console.WriteLine("📊 FASE 3: Atualizando informações de sincronização...")
+        AtualizarInfoUltimaSincronizacao()
     End Sub
 
     ''' <summary>
@@ -2379,65 +2686,15 @@ Public Class MainForm
 
             ' Resetar progress bars no início
             ResetProgress()
-            UpdateProgress(0, "Iniciando sequência de inicialização...")
-            Await Task.Delay(500)
 
-            ' ETAPA 1: Verificar Atualizações (0% -> 20%)
-            Console.WriteLine("📋 ETAPA 1/3: Verificando atualizações...")
-            UpdateProgress(5, "📋 Verificando atualizações disponíveis...")
-            Dim updateSuccess = Await ExecutarVerificacaoAtualizacoes()
-            If Not updateSuccess Then
-                Console.WriteLine("⚠️ Falha na verificação de atualizações - continuando mesmo assim...")
-                UpdateProgress(20, "⚠️ Verificação de atualizações com problemas - continuando...")
-            Else
-                UpdateProgress(20, "✅ Verificação de atualizações concluída")
+            ' Executar sequência de inicialização
+            Dim success = Await ExecutarSequenciaInicializacao()
+
+            If success Then
+                ShowSuccessMessage("Sistema SUAT-IA iniciado e sincronizado com sucesso!")
+                ' Atualizar informações de sincronização após sequência completa
+                AtualizarInfoUltimaSincronizacao()
             End If
-            Await Task.Delay(500)
-            Console.WriteLine()
-
-            ' ETAPA 2: Iniciar Sistema (20% -> 80%)
-            Console.WriteLine("🚀 ETAPA 2/3: Iniciando sistema...")
-            UpdateProgress(25, "🚀 Iniciando sistema SUAT-IA...")
-            Dim startupSuccess = Await ExecutarInicializacaoSistema()
-            If Not startupSuccess Then
-                Console.WriteLine("❌ Falha na inicialização do sistema - abortando sequência")
-                
-                ' Resetar progress bars e restaurar elementos do StatusStrip
-                ResetProgress()
-                UpdateStatus("❌ Falha na inicialização do sistema")
-                
-                MessageBox.Show("Falha na inicialização do sistema. Verifique os logs para mais detalhes.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
-                Return
-            End If
-            UpdateProgress(80, "✅ Sistema iniciado com sucesso")
-            Await Task.Delay(500)
-            Console.WriteLine()
-
-            ' ETAPA 3: Sincronizar Dados (80% -> 100%)
-            Console.WriteLine("🔄 ETAPA 3/3: Sincronizando dados...")
-            UpdateProgress(85, "🔄 Sincronizando dados...")
-            Dim syncSuccess = Await ExecutarSincronizacaoDados()
-            If Not syncSuccess Then
-                Console.WriteLine("⚠️ Falha na sincronização de dados - sistema iniciado mas sem sincronização")
-                
-                ' Resetar progress bars após pequeno delay para mostrar falha
-                UpdateProgress(95, "⚠️ Sistema iniciado - falha na sincronização")
-                Await Task.Delay(2000)
-                ResetProgress()
-                UpdateStatus("⚠️ Sistema iniciado - falha na sincronização")
-                
-                MessageBox.Show("Sistema iniciado com sucesso, mas houve falha na sincronização de dados.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                Return ' Sair aqui para não executar o delay de sucesso
-            Else
-                Console.WriteLine("✅ Sequência completa finalizada com sucesso!")
-                UpdateProgress(100, "✅ Sistema iniciado e sincronizado com sucesso!")
-                MessageBox.Show("Sistema SUAT-IA iniciado e sincronizado com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-
-            Console.WriteLine()
-            Console.WriteLine("🎯 ======================================")
-            Console.WriteLine("🎯    MENU INICIAR CONCLUÍDO")
-            Console.WriteLine("🎯 ======================================")
 
             ' Manter progress bars em 100% por alguns segundos e depois resetar
             Await Task.Delay(5000)
@@ -2446,18 +2703,16 @@ Public Class MainForm
 
         Catch ex As Exception
             Console.WriteLine($"❌ Erro no menu INICIAR: {ex.Message}")
-            
-            ' Resetar progress bars e restaurar elementos do StatusStrip
             ResetProgress()
             UpdateStatus("❌ Erro na sequência de inicialização")
-            
-            MessageBox.Show($"Erro na sequência de inicialização:\n\n{ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ShowErrorMessage($"Erro na sequência de inicialização: {ex.Message}")
         End Try
     End Sub
 
     Private Async Sub OnMenuPararClick(sender As Object, e As EventArgs) Handles PARAR.Click
         Try
             Console.WriteLine("🔴 Menu PARAR acionado")
+            UpdateStatus("Parando sistema...")
 
             ' Executar lógica de parada diretamente
             Await ExecutarParadaCompleta()
@@ -2466,8 +2721,12 @@ Public Class MainForm
             Console.WriteLine("🔍 Detectando novo status após parar...")
             Await DetectarStatusServicosAsync()
 
+            UpdateStatus("Sistema parado")
+
         Catch ex As Exception
             Console.WriteLine($"❌ Erro no menu PARAR: {ex.Message}")
+            ShowErrorMessage($"Erro ao parar sistema: {ex.Message}")
+            UpdateStatus("Erro ao parar sistema")
         End Try
     End Sub
 
@@ -2508,10 +2767,10 @@ Public Class MainForm
 
         Catch ex As Exception
             Console.WriteLine($"   ❌ Erro na verificação de atualizações: {ex.Message}")
-            
+
             ' Mostrar erro mas não resetar ainda (continuará para próxima etapa)
             UpdateProgress(20, $"❌ Erro na verificação: {ex.Message}")
-            
+
             Return False
         End Try
     End Function
@@ -2567,11 +2826,11 @@ Public Class MainForm
 
         Catch ex As Exception
             Console.WriteLine($"   ❌ Erro na inicialização do sistema: {ex.Message}")
-            
+
             ' Resetar progress bars em caso de erro
             ResetProgress()
             UpdateStatus($"❌ Erro na inicialização: {ex.Message}")
-            
+
             Return False
         End Try
     End Function
@@ -2607,10 +2866,10 @@ Public Class MainForm
 
         Catch ex As Exception
             Console.WriteLine($"   ❌ Erro na sincronização de dados: {ex.Message}")
-            
+
             ' Mostrar erro mas não usar Await em Catch
             UpdateProgress(85, $"❌ Erro na sincronização: {ex.Message}")
-            
+
             Return False
         End Try
     End Function

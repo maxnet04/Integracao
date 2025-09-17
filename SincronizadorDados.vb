@@ -234,9 +234,12 @@ Public Class SincronizadorDados
             ' Atualizar dados históricos agregados
             Console.WriteLine("📊 Atualizando dados históricos agregados...")
             AtualizarDadosHistoricos()
-            
+
+            ' Registrar data de sincronização
+            RegistrarDataSincronizacao()
+
             Console.WriteLine("✅ Carga incremental concluída!")
-            
+
         Catch ex As Exception
             Console.WriteLine($"❌ Erro na carga incremental: {ex.Message}")
             Throw
@@ -245,13 +248,13 @@ Public Class SincronizadorDados
             dbManager.Desconectar()
         End Try
     End Sub
-    
+
     ''' <summary>
     ''' Executa sincronização de teste com dados fixos (método original mantido para compatibilidade)
     ''' </summary>
     Public Sub ExecutarSincronizacaoTeste()
         Console.WriteLine("🔄 Iniciando sincronização de teste...")
-        
+
         Try
             ' Conectar ao banco
             Dim conexaoResult = dbManager.Conectar()
@@ -259,23 +262,23 @@ Public Class SincronizadorDados
                 Console.WriteLine($"❌ Erro ao conectar: {conexaoResult.Mensagem}")
                 Return
             End If
-            
+
             Console.WriteLine($"✅ Conectado ao banco: {conexaoResult.TotalTabelas} tabelas encontradas")
-            
+
             ' Limpar dados existentes (opcional)
             Console.WriteLine("🧹 Limpando dados existentes...")
             LimparDadosExistentes()
-            
+
             ' Inserir dados de teste
             Console.WriteLine("📝 Inserindo dados de teste...")
             InserirDadosTeste()
-            
+
             ' Atualizar dados históricos
             Console.WriteLine("📊 Atualizando dados históricos...")
             AtualizarDadosHistoricos()
-            
+
             Console.WriteLine("✅ Sincronização de teste concluída!")
-            
+
         Catch ex As Exception
             Console.WriteLine($"❌ Erro na sincronização: {ex.Message}")
             Throw
@@ -284,40 +287,40 @@ Public Class SincronizadorDados
             dbManager.Desconectar()
         End Try
     End Sub
-    
+
     ''' <summary>
     ''' Insere dados históricos completos simulando 3 anos de dados
     ''' </summary>
     Private Sub InserirDadosHistoricosCompletos()
         Dim registrosInseridos As Integer = 0
         Dim registrosComErro As Integer = 0
-        
+
         ' Gerar dados para os últimos 3 anos (aproximadamente 1000 incidentes)
         Dim dataInicio = DateTime.Now.AddYears(-3)
         Dim dataFim = DateTime.Now
-        
+
         ' Grupos de suporte
         Dim grupos As String() = {"Suporte Técnico", "Desenvolvimento", "Infraestrutura", "Segurança", "DBA"}
         Dim categorias As String() = {"Acesso", "Hardware", "Software", "Rede", "Email", "Backup", "Segurança", "Performance"}
         Dim prioridades As String() = {"Baixa", "Média", "Alta", "Crítica"}
         Dim departamentos As String() = {"TI", "Administrativo", "Financeiro", "Vendas", "Marketing", "RH", "Operações"}
-        
+
         Dim random As New Random(42) ' Seed fixo para reprodutibilidade
-        
+
         ' Gerar aproximadamente 1000 incidentes distribuídos nos 3 anos
         For i As Integer = 1 To 1000
             Try
                 ' Data aleatória nos últimos 3 anos
                 Dim diasAleatorios = random.Next(0, (dataFim - dataInicio).Days)
                 Dim dataCriacao = dataInicio.AddDays(diasAleatorios)
-                
+
                 ' 80% dos incidentes têm data de encerramento
                 Dim dataEncerramento As DateTime? = Nothing
                 If random.Next(100) < 80 Then
                     Dim tempoResolucao = random.Next(1, 30) ' 1 a 30 dias
                     dataEncerramento = dataCriacao.AddDays(tempoResolucao)
                 End If
-                
+
                 Dim incidente As New IncidenteTeste With {
                     .Id = $"INC{dataCriacao:yyyyMMdd}{i:D3}",
                     .Assunto = GerarAssuntoAleatorio(random, categorias(random.Next(categorias.Length))),
@@ -364,39 +367,41 @@ Public Class SincronizadorDados
 
     ''' <summary>
     ''' Insere dados incrementais (apenas dados novos desde a última sincronização)
+    ''' LÓGICA: Se última data é 10/09/2025 10:00:00, busca registros com data > 10/09/2025 10:00:00
     ''' </summary>
     Private Sub InserirDadosIncrementais(ultimaData As DateTime)
         Dim registrosInseridos As Integer = 0
         Dim registrosComErro As Integer = 0
 
-        ' Verificar se a última data é futura ou muito antiga
+        ' Definir período de busca incremental
         Dim dataFim = DateTime.Now
         Dim dataInicio As DateTime
 
         If ultimaData > dataFim Then
             ' Se a última data é futura, usar os últimos 7 dias
-            Console.WriteLine($"   ⚠️ Última data ({ultimaData:dd/MM/yyyy}) é futura. Usando últimos 7 dias.")
+            Console.WriteLine($"   ⚠️ Última data ({ultimaData:dd/MM/yyyy HH:mm:ss}) é futura. Usando últimos 7 dias.")
             dataInicio = dataFim.AddDays(-7)
         Else
-            ' Usar a data após a última sincronização
-            dataInicio = ultimaData.AddDays(1)
+            ' LÓGICA CORRETA: Usar a data EXATA da última sincronização (não +1 dia)
+            ' Qualquer registro com data > ultimaData deve ser incluído
+            dataInicio = ultimaData
+            Console.WriteLine($"   📅 Buscando dados MAIORES que {dataInicio:dd/MM/yyyy HH:mm:ss} até {dataFim:dd/MM/yyyy HH:mm:ss}")
         End If
 
         ' Verificar se há período válido para gerar dados
-        Dim diasDisponiveis = (dataFim - dataInicio).Days
-        If diasDisponiveis <= 0 Then
-            Console.WriteLine($"   ℹ️ Nenhum período válido para dados incrementais (dias: {diasDisponiveis})")
+        Dim tempoDisponivel = dataFim - dataInicio
+        If tempoDisponivel.TotalSeconds <= 0 Then
+            Console.WriteLine($"   ℹ️ Nenhum período válido para dados incrementais (tempo: {tempoDisponivel.TotalSeconds:F0} segundos)")
             Return
         End If
 
-        ' Limitar o período máximo para evitar overflow
-        Dim periodoMaximo = Math.Min(diasDisponiveis, 30) ' Máximo 30 dias
-        If diasDisponiveis > 30 Then
-            Console.WriteLine($"   ⚠️ Período muito longo ({diasDisponiveis} dias). Limitando a 30 dias.")
+        ' Limitar o período máximo para evitar overflow (máximo 30 dias)
+        If tempoDisponivel.TotalDays > 30 Then
+            Console.WriteLine($"   ⚠️ Período muito longo ({tempoDisponivel.TotalDays:F1} dias). Limitando a 30 dias.")
             dataInicio = dataFim.AddDays(-30)
         End If
 
-        Console.WriteLine($"   📅 Gerando dados de {dataInicio:dd/MM/yyyy} até {dataFim:dd/MM/yyyy} ({periodoMaximo} dias)")
+        Console.WriteLine($"   📅 Gerando dados MAIORES que {dataInicio:dd/MM/yyyy HH:mm:ss} até {dataFim:dd/MM/yyyy HH:mm:ss}")
 
         ' Grupos de suporte
         Dim grupos As String() = {"Suporte Técnico", "Desenvolvimento", "Infraestrutura", "Segurança", "DBA"}
@@ -409,9 +414,19 @@ Public Class SincronizadorDados
         ' Gerar aproximadamente 50 incidentes no período válido
         For i As Integer = 1 To 50
             Try
-                ' Data aleatória no período válido (usando período limitado)
-                Dim diasAleatorios = random.Next(0, periodoMaximo + 1)
-                Dim dataCriacao = dataInicio.AddDays(diasAleatorios)
+                ' Data aleatória MAIOR que dataInicio e menor/igual que dataFim
+                Dim tempoAleatorio = random.Next(1, CInt((dataFim - dataInicio).TotalSeconds) + 1)
+                Dim dataCriacao = dataInicio.AddSeconds(tempoAleatorio)
+
+                ' Garantir que a data seja maior que dataInicio
+                If dataCriacao <= dataInicio Then
+                    dataCriacao = dataInicio.AddSeconds(1)
+                End If
+
+                ' Garantir que não seja futura
+                If dataCriacao > dataFim Then
+                    dataCriacao = dataFim
+                End If
 
                 ' 70% dos incidentes têm data de encerramento (mais realista para dados recentes)
                 Dim dataEncerramento As DateTime? = Nothing
@@ -486,11 +501,26 @@ Public Class SincronizadorDados
     ''' </summary>
     Private Function ObterDataUltimoRegistro() As DateTime
         Try
+            Console.WriteLine("   🔍 Buscando última data de sincronização...")
+
+            ' Primeiro, tentar buscar da tabela de controle de sincronização (se existir)
+            Dim resultadoControle = dbManager.ExecutarQuery("SELECT MAX(last_sync_date) as ultima_sync FROM sync_control")
+            If resultadoControle.Success AndAlso resultadoControle.Registros.Count > 0 Then
+                Dim ultimaSync = resultadoControle.Registros(0)("ultima_sync")
+                If ultimaSync IsNot Nothing AndAlso Not IsDBNull(ultimaSync) Then
+                    Dim dataSync = DateTime.Parse(ultimaSync.ToString())
+                    Console.WriteLine($"   📅 Última sincronização registrada: {dataSync:dd/MM/yyyy HH:mm:ss}")
+                    Return dataSync
+                End If
+            End If
+
+            ' Se não há controle de sincronização, buscar a data máxima dos incidentes
             Dim resultado = dbManager.ExecutarQuery("SELECT MAX(DATA_CRIACAO) as ultima_data FROM incidents")
             If resultado.Success AndAlso resultado.Registros.Count > 0 Then
                 Dim ultimaData = resultado.Registros(0)("ultima_data")
                 If ultimaData IsNot Nothing AndAlso Not IsDBNull(ultimaData) Then
                     Dim data = DateTime.Parse(ultimaData.ToString())
+                    Console.WriteLine($"   📅 Último incidente encontrado: {data:dd/MM/yyyy HH:mm:ss}")
 
                     ' Verificar se a data é válida e não é futura
                     If data > DateTime.Now Then
@@ -501,12 +531,55 @@ Public Class SincronizadorDados
                     Return data
                 End If
             End If
+
+            Console.WriteLine("   ℹ️ Nenhum registro encontrado. Usando padrão de 7 dias atrás.")
             Return DateTime.Now.AddDays(-7) ' Padrão: 7 dias atrás
         Catch ex As Exception
             Console.WriteLine($"   ⚠️ Erro ao obter última data: {ex.Message}")
             Return DateTime.Now.AddDays(-7) ' Padrão: 7 dias atrás
         End Try
     End Function
+
+    ''' <summary>
+    ''' Registra a data da última sincronização para controle incremental
+    ''' </summary>
+    Private Sub RegistrarDataSincronizacao()
+        Try
+            Console.WriteLine("   📝 Registrando data de sincronização...")
+
+            ' Criar tabela de controle se não existir
+            Dim createTableQuery = "
+                CREATE TABLE IF NOT EXISTS sync_control (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    last_sync_date DATETIME NOT NULL,
+                    sync_type VARCHAR(50) NOT NULL,
+                    records_processed INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )"
+
+            Dim resultadoCreate = dbManager.ExecutarQuery(createTableQuery)
+            If Not resultadoCreate.Success Then
+                Console.WriteLine($"   ⚠️ Erro ao criar tabela de controle: {resultadoCreate.Mensagem}")
+                Return
+            End If
+
+            ' Inserir registro de sincronização
+            Dim dataAtual = DateTime.Now
+            Dim insertQuery = $"
+                INSERT INTO sync_control (last_sync_date, sync_type, records_processed) 
+                VALUES ('{dataAtual:yyyy-MM-dd HH:mm:ss}', 'incremental', 0)"
+
+            Dim resultadoInsert = dbManager.ExecutarQuery(insertQuery)
+            If resultadoInsert.Success Then
+                Console.WriteLine($"   ✅ Data de sincronização registrada: {dataAtual:dd/MM/yyyy HH:mm:ss}")
+            Else
+                Console.WriteLine($"   ⚠️ Erro ao registrar data de sincronização: {resultadoInsert.Mensagem}")
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"   ⚠️ Erro ao registrar data de sincronização: {ex.Message}")
+        End Try
+    End Sub
 
     ''' <summary>
     ''' Limpa dados existentes das tabelas
