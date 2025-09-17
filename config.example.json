@@ -1,0 +1,13 @@
+{
+  "SqlServer": {
+    "Server": "localhost",
+    "Database": "SUAT_DB",
+    "Username": "",
+    "Password": "",
+    "UseWindowsAuth": true
+  },
+  "Sqlite": {
+    "Path": "..\\data\\database.sqlite"
+  }
+}
+
