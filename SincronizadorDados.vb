@@ -5,6 +5,17 @@ Imports System.Linq
 Imports System.Windows.Forms
 
 ''' <summary>
+''' Classe para retornar informações de sincronização
+''' </summary>
+Public Class SyncInfo
+    Public Property Status As String
+    Public Property Detalhes As String
+    Public Property UltimaSincronizacao As String
+    Public Property TotalIncidentes As Integer
+    Public Property Success As Boolean
+End Class
+
+''' <summary>
 ''' Classe responsável pela sincronização de dados usando dados fixos para teste
 ''' Compatível com .NET Framework 4.7
 ''' Implementa o plano de execução para nova instalação
@@ -494,6 +505,100 @@ Public Class SincronizadorDados
         Else
             Return "Problema técnico geral"
         End If
+    End Function
+
+    ''' <summary>
+    ''' Obtém informações completas de sincronização para exibição
+    ''' </summary>
+    Public Function ObterInformacoesSincronizacao() As SyncInfo
+        Try
+            ' Verificar se o banco existe
+            If Not File.Exists(Path.Combine(Application.StartupPath, "data", "database.sqlite")) Then
+                Return New SyncInfo With {
+                    .Status = "❌ Banco de dados não encontrado",
+                    .Detalhes = "💡 Execute 'Carga Inicial' para instalar o sistema",
+                    .UltimaSincronizacao = "N/A",
+                    .TotalIncidentes = 0,
+                    .Success = False
+                }
+            End If
+            
+            ' Conectar ao banco
+            Dim conexaoResult = dbManager.Conectar()
+            If Not conexaoResult.Success Then
+                Return New SyncInfo With {
+                    .Status = "❌ Erro ao conectar ao banco",
+                    .Detalhes = "💡 Verifique se o sistema foi instalado corretamente",
+                    .UltimaSincronizacao = "N/A",
+                    .TotalIncidentes = 0,
+                    .Success = False
+                }
+            End If
+            
+            ' Verificar total de incidentes
+            Dim resultadoContagem = dbManager.ExecutarQuery("SELECT COUNT(*) as total FROM incidents")
+            If Not resultadoContagem.Success Then
+                Return New SyncInfo With {
+                    .Status = "❌ Erro ao verificar dados do banco",
+                    .Detalhes = "💡 Execute 'Carga Inicial' para instalar o sistema",
+                    .UltimaSincronizacao = "N/A",
+                    .TotalIncidentes = 0,
+                    .Success = False
+                }
+            End If
+            
+            Dim totalIncidentes = Convert.ToInt32(resultadoContagem.Registros(0)("total"))
+            
+            If totalIncidentes = 0 Then
+                Return New SyncInfo With {
+                    .Status = "📋 Banco de dados vazio (0 incidentes)",
+                    .Detalhes = "💡 Execute 'Carga Inicial' para instalar o sistema",
+                    .UltimaSincronizacao = "N/A",
+                    .TotalIncidentes = 0,
+                    .Success = True
+                }
+            End If
+            
+            ' Buscar data da última sincronização
+            Dim ultimaSincronizacao As String = "N/A"
+            
+            ' Primeiro, tentar buscar da tabela de controle
+            Dim resultadoSync = dbManager.ExecutarQuery("SELECT MAX(last_sync_date) as ultima_sync FROM sync_control")
+            If resultadoSync.Success AndAlso resultadoSync.Registros.Count > 0 Then
+                Dim ultimaSync = resultadoSync.Registros(0)("ultima_sync")
+                If ultimaSync IsNot Nothing AndAlso Not IsDBNull(ultimaSync) Then
+                    ultimaSincronizacao = DateTime.Parse(ultimaSync.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
+                End If
+            End If
+            
+            ' Se não há controle de sync, buscar data do último incidente
+            If ultimaSincronizacao = "N/A" Then
+                Dim resultadoUltimo = dbManager.ExecutarQuery("SELECT MAX(DATA_CRIACAO) as ultima_data FROM incidents")
+                If resultadoUltimo.Success AndAlso resultadoUltimo.Registros.Count > 0 Then
+                    Dim ultimaData = resultadoUltimo.Registros(0)("ultima_data")
+                    If ultimaData IsNot Nothing AndAlso Not IsDBNull(ultimaData) Then
+                        ultimaSincronizacao = DateTime.Parse(ultimaData.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
+                    End If
+                End If
+            End If
+            
+            Return New SyncInfo With {
+                .Status = "✅ Sistema operacional",
+                .Detalhes = $"📋 Total de incidentes: {totalIncidentes:N0}",
+                .UltimaSincronizacao = ultimaSincronizacao,
+                .TotalIncidentes = totalIncidentes,
+                .Success = True
+            }
+            
+        Catch ex As Exception
+            Return New SyncInfo With {
+                .Status = "❌ Erro ao verificar status",
+                .Detalhes = $"💡 Detalhes: {ex.Message}",
+                .UltimaSincronizacao = "N/A",
+                .TotalIncidentes = 0,
+                .Success = False
+            }
+        End Try
     End Function
 
     ''' <summary>

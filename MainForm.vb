@@ -214,94 +214,46 @@ Public Class MainForm
     End Sub
 
     ''' <summary>
-    ''' Obtém informações da última sincronização
+    ''' Obtém informações da última sincronização usando o SincronizadorDados
     ''' </summary>
     Private Function ObterInfoUltimaSincronizacao() As String
         Try
-            ' Verificar se o banco existe
-            If Not File.Exists(Path.Combine(Application.StartupPath, "data", "database.sqlite")) Then
-                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
-                       "❌ Banco de dados não encontrado" & Environment.NewLine &
-                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
-                       "🕐 Última sincronização: N/A"
-            End If
-
-            ' Conectar ao banco para verificar dados
-            Dim dbManager As New DatabaseManager()
-            Dim conexaoResult = dbManager.Conectar()
-
-            If Not conexaoResult.Success Then
-                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
-                       "❌ Erro ao conectar ao banco" & Environment.NewLine &
-                       "💡 Verifique se o sistema foi instalado corretamente" & Environment.NewLine &
-                       "🕐 Última sincronização: N/A"
-            End If
-
-            ' Verificar se há dados na tabela incidents
-            Dim resultadoContagem = dbManager.ExecutarQuery("SELECT COUNT(*) as total FROM incidents")
-            If Not resultadoContagem.Success Then
-                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
-                       "❌ Erro ao verificar dados do banco" & Environment.NewLine &
-                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
-                       "🕐 Última sincronização: N/A"
-            End If
-
-            Dim totalIncidentes = Convert.ToInt32(resultadoContagem.Registros(0)("total"))
-
-            If totalIncidentes = 0 Then
-                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
-                       "📋 Banco de dados vazio (0 incidentes)" & Environment.NewLine &
-                       "💡 Execute 'Carga Inicial' para instalar o sistema" & Environment.NewLine &
-                       "🕐 Última sincronização: N/A"
-            End If
-
-            ' Buscar data da última sincronização (tabela de controle)
-            Dim resultadoSync = dbManager.ExecutarQuery("SELECT MAX(last_sync_date) as ultima_sync FROM sync_control")
-            Dim ultimaSincronizacao As String = "N/A"
-
-            If resultadoSync.Success AndAlso resultadoSync.Registros.Count > 0 Then
-                Dim ultimaSync = resultadoSync.Registros(0)("ultima_sync")
-                If ultimaSync IsNot Nothing AndAlso Not IsDBNull(ultimaSync) Then
-                    ultimaSincronizacao = DateTime.Parse(ultimaSync.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
-                End If
-            End If
-
-            ' Se não há controle de sync, buscar data do último incidente
-            If ultimaSincronizacao = "N/A" Then
-                Dim resultadoUltimo = dbManager.ExecutarQuery("SELECT MAX(DATA_CRIACAO) as ultima_data FROM incidents")
-                If resultadoUltimo.Success AndAlso resultadoUltimo.Registros.Count > 0 Then
-                    Dim ultimaData = resultadoUltimo.Registros(0)("ultima_data")
-                    If ultimaData IsNot Nothing AndAlso Not IsDBNull(ultimaData) Then
-                        ultimaSincronizacao = DateTime.Parse(ultimaData.ToString()).ToString("dd/MM/yyyy HH:mm:ss")
-                    End If
-                End If
-            End If
-
+            ' Obter informações do sincronizador (sem conexão direta com banco no MainForm)
+            Dim syncInfo = sincronizador.ObterInformacoesSincronizacao()
+            
             ' Verificar status dos serviços
             Dim statusBackend = "🔴 Offline"
             Dim statusFrontend = "🔴 Offline"
-
+            
             Try
                 If backendApiManager IsNot Nothing AndAlso backendApiManager.IsRunning Then
                     statusBackend = "🟢 Online"
                 End If
             Catch
             End Try
-
+            
             Try
                 If frontendServer IsNot Nothing AndAlso frontendServer.IsServerRunning Then
                     statusFrontend = "🟢 Online"
                 End If
             Catch
             End Try
-
+            
+            ' Montar mensagem baseada no resultado
+            If Not syncInfo.Success Then
+                Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
+                       syncInfo.Status & Environment.NewLine &
+                       syncInfo.Detalhes & Environment.NewLine &
+                       $"🕐 Última sincronização: {syncInfo.UltimaSincronizacao}"
+            End If
+            
             Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
-                   $"📋 Total de incidentes: {totalIncidentes:N0}" & Environment.NewLine &
+                   syncInfo.Detalhes & Environment.NewLine &
                    $"🖥️ Backend: {statusBackend}" & Environment.NewLine &
                    $"🌐 Frontend: {statusFrontend}" & Environment.NewLine &
-                   $"🕐 Última sincronização: {ultimaSincronizacao}" & Environment.NewLine &
+                   $"🕐 Última sincronização: {syncInfo.UltimaSincronizacao}" & Environment.NewLine &
                    $"📅 Atualizado em: {DateTime.Now:dd/MM/yyyy HH:mm:ss}"
-
+            
         Catch ex As Exception
             Return "📊 STATUS DO SISTEMA:" & Environment.NewLine &
                    "❌ Erro ao verificar status" & Environment.NewLine &

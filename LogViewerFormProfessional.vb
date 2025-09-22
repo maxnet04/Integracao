@@ -1087,14 +1087,56 @@ Public Class LogViewerFormProfessional
             Dim g = e.Graphics
             g.Clear(Color.FromArgb(60, 60, 60))
             If currentSearchPositions Is Nothing OrElse currentSearchPositions.Count = 0 Then Return
-            Dim total As Integer = Math.Max(1, rtbLogs.TextLength)
+            
             Dim h As Integer = CType(sender, Control).Height
+            Dim totalLines As Integer = Math.Max(1, rtbLogs.Lines.Length)
+            
+            ' Calcular quantas linhas realmente cabem na área visível do RichTextBox
+            Dim lineHeight As Single = rtbLogs.Font.Height
+            Dim visibleLinesFloat As Single = rtbLogs.ClientSize.Height / lineHeight
+            Dim maxVisibleLines As Integer = Math.Floor(visibleLinesFloat)
+            
+            ' Determinar a área efetiva que o texto ocupa no minimap
+            Dim textAreaRatio As Single = Math.Min(1.0F, maxVisibleLines / totalLines)
+            Dim effectiveMinimapHeight As Integer = CInt(h * textAreaRatio)
+            
+            ' Desenhar uma linha sutil para mostrar onde termina a área do texto
+            If effectiveMinimapHeight < h Then
+                Using pen As New Pen(Color.FromArgb(100, 100, 100), 1)
+                    g.DrawLine(pen, 0, effectiveMinimapHeight, CType(sender, Control).Width, effectiveMinimapHeight)
+                End Using
+            End If
+            
             For i As Integer = 0 To currentSearchPositions.Count - 1
                 Dim pos As Integer = currentSearchPositions(i)
-                Dim y As Integer = CInt((pos / total) * h)
+                
+                ' Obter linha da posição
+                Dim lineIndex As Integer = rtbLogs.GetLineFromCharIndex(pos)
+                
+                ' Calcular posição Y baseada na linha dentro da área efetiva
+                Dim y As Integer
+                If totalLines <= maxVisibleLines Then
+                    ' Se todo o texto cabe, usar proporção direta
+                    y = CInt((lineIndex / totalLines) * effectiveMinimapHeight)
+                Else
+                    ' Se o texto é maior que a área visível, mapear apenas a parte visível
+                    Dim firstVisibleLine As Integer = rtbLogs.GetLineFromCharIndex(rtbLogs.GetCharIndexFromPosition(New Point(0, 0)))
+                    Dim relativeLineIndex As Integer = lineIndex - firstVisibleLine
+                    
+                    ' Só desenhar se a linha está na área visível atual
+                    If relativeLineIndex >= 0 AndAlso relativeLineIndex < maxVisibleLines Then
+                        y = CInt((relativeLineIndex / maxVisibleLines) * effectiveMinimapHeight)
+                    Else
+                        Continue For ' Pular linhas que não estão visíveis
+                    End If
+                End If
+                
+                ' Garantir que não ultrapasse a área efetiva
+                y = Math.Max(0, Math.Min(y, effectiveMinimapHeight - 4))
+                
                 Dim c As Color = If(i = currentSearchIndex, activeHighlightColor, defaultHighlightColor)
                 Using br As New SolidBrush(c)
-                    g.FillRectangle(br, 0, Math.Max(0, y - 2), CType(sender, Control).Width, 4)
+                    g.FillRectangle(br, 0, y, CType(sender, Control).Width, 3)
                 End Using
             Next
         Catch
