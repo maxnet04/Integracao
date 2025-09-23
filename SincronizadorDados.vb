@@ -16,6 +16,22 @@ Public Class SyncInfo
 End Class
 
 ''' <summary>
+''' Classe para controle de progresso da sincronização
+''' </summary>
+Public Class ProgressInfo
+    Public Property Percentual As Integer
+    Public Property Mensagem As String
+    Public Property RegistrosProcessados As Integer
+    Public Property TotalRegistros As Integer
+    Public Property TempoEstimado As TimeSpan
+End Class
+
+''' <summary>
+''' Delegate para callback de progresso
+''' </summary>
+Public Delegate Sub ProgressCallback(progress As ProgressInfo)
+
+''' <summary>
 ''' Classe responsável pela sincronização de dados usando dados fixos para teste
 ''' Compatível com .NET Framework 4.7
 ''' Implementa o plano de execução para nova instalação
@@ -25,6 +41,10 @@ Public Class SincronizadorDados
     Private Const LOCAL_VERSION_FILE As String = "version.local"
     Private Const INSTALLATION_FLAG_FILE As String = "installation.flag"
     Private Const DATABASE_INIT_FILE As String = "database.init"
+    
+    ' Constantes para processamento em lotes
+    Private Const TAMANHO_LOTE As Integer = 1000 ' Processar 1000 registros por vez
+    Private Const INTERVALO_PROGRESSO As Integer = 100 ' Reportar progresso a cada 100 registros
     
     Public Sub New(Optional dbPath As String = Nothing)
         dbManager = New DatabaseManager(dbPath)
@@ -177,6 +197,61 @@ Public Class SincronizadorDados
         Return "1.0.0"
     End Function
     
+    ''' <summary>
+    ''' Executa carga inicial de dados reais com controle de progresso
+    ''' Processa dados em lotes para otimizar memória e fornece feedback visual
+    ''' </summary>
+    ''' <param name="dadosOrigem">Função que retorna os dados da origem (ex: banco de dados externo)</param>
+    ''' <param name="callbackProgresso">Callback para reportar progresso (opcional)</param>
+    ''' <param name="totalRegistros">Total estimado de registros (opcional, para cálculo de progresso)</param>
+    Public Sub RealizarCargaInicialDadosReais(dadosOrigem As Func(Of IEnumerable(Of IncidenteReal)), 
+                                             Optional callbackProgresso As ProgressCallback = Nothing,
+                                             Optional totalRegistros As Integer = 0)
+        Console.WriteLine("🔄 Iniciando carga inicial de dados reais...")
+        
+        Try
+            ' Conectar ao banco
+            Dim conexaoResult = dbManager.Conectar()
+            If Not conexaoResult.Success Then
+                Console.WriteLine($"❌ Erro ao conectar: {conexaoResult.Mensagem}")
+                Return
+            End If
+            
+            Console.WriteLine($"✅ Conectado ao banco: {conexaoResult.TotalTabelas} tabelas encontradas")
+            
+            ' Limpar dados existentes para carga completa
+            Console.WriteLine("🧹 Limpando dados existentes para carga inicial...")
+            LimparDadosExistentes()
+            
+            ' Obter dados da origem
+            Console.WriteLine("📡 Obtendo dados da origem...")
+            Dim dados As IEnumerable(Of IncidenteReal)
+            Try
+                dados = dadosOrigem()
+            Catch ex As Exception
+                Console.WriteLine($"❌ Erro ao obter dados da origem: {ex.Message}")
+                Throw
+            End Try
+            
+            ' Processar dados em lotes
+            Console.WriteLine("📝 Processando dados em lotes...")
+            ProcessarDadosEmLotes(dados, callbackProgresso, totalRegistros)
+            
+            ' Atualizar dados históricos agregados
+            Console.WriteLine("📊 Atualizando dados históricos agregados...")
+            AtualizarDadosHistoricos()
+            
+            Console.WriteLine("✅ Carga inicial de dados reais concluída!")
+            
+        Catch ex As Exception
+            Console.WriteLine($"❌ Erro na carga inicial de dados reais: {ex.Message}")
+            Throw
+        Finally
+            ' Desconectar do banco
+            dbManager.Desconectar()
+        End Try
+    End Sub
+
     ''' <summary>
     ''' Executa carga inicial completa dos dados (últimos 3 anos simulados)
     ''' Usado na primeira instalação
@@ -834,6 +909,149 @@ Public Class SincronizadorDados
     End Sub
     
     ''' <summary>
+    ''' Processa dados em lotes para otimizar memória e fornece feedback de progresso
+    ''' </summary>
+    Private Sub ProcessarDadosEmLotes(dados As IEnumerable(Of IncidenteReal), 
+                                     callbackProgresso As ProgressCallback, 
+                                     totalRegistros As Integer)
+        Dim registrosProcessados As Integer = 0
+        Dim registrosComErro As Integer = 0
+        Dim inicioProcessamento = DateTime.Now
+        
+        ' Se não foi informado o total, tentar contar (pode ser custoso)
+        If totalRegistros = 0 Then
+            Try
+                totalRegistros = dados.Count()
+                Console.WriteLine($"   📊 Total de registros detectado: {totalRegistros:N0}")
+            Catch ex As Exception
+                Console.WriteLine($"   ⚠️ Não foi possível contar registros: {ex.Message}")
+                totalRegistros = -1 ' Indica que não sabemos o total
+            End Try
+        End If
+        
+        ' Processar em lotes
+        Dim lote As New List(Of IncidenteReal)(TAMANHO_LOTE)
+        
+        For Each incidente In dados
+            lote.Add(incidente)
+            
+            ' Processar lote quando atingir o tamanho máximo
+            If lote.Count >= TAMANHO_LOTE Then
+                ProcessarLote(lote, registrosProcessados, registrosComErro)
+                registrosProcessados += lote.Count
+                lote.Clear()
+                
+                ' Reportar progresso
+                ReportarProgresso(callbackProgresso, registrosProcessados, totalRegistros, 
+                                inicioProcessamento, registrosComErro)
+            End If
+        Next
+        
+        ' Processar lote restante
+        If lote.Count > 0 Then
+            ProcessarLote(lote, registrosProcessados, registrosComErro)
+            registrosProcessados += lote.Count
+        End If
+        
+        ' Progresso final
+        ReportarProgresso(callbackProgresso, registrosProcessados, totalRegistros, 
+                        inicioProcessamento, registrosComErro, True)
+        
+        Console.WriteLine($"   ✅ Processamento concluído: {registrosProcessados:N0} registros processados")
+        If registrosComErro > 0 Then
+            Console.WriteLine($"   ⚠️ {registrosComErro:N0} registros com erro")
+        End If
+    End Sub
+    
+    ''' <summary>
+    ''' Processa um lote de incidentes
+    ''' </summary>
+    Private Sub ProcessarLote(lote As List(Of IncidenteReal), 
+                             ByRef registrosProcessados As Integer, 
+                             ByRef registrosComErro As Integer)
+        For Each incidente In lote
+            Try
+                ' Usar o método do DatabaseManager que recebe os campos individuais
+                Dim resultado = dbManager.InserirIncidente(
+                    incidente.Id,
+                    incidente.Assunto,
+                    incidente.Departamento,
+                    incidente.GrupoDirecionado,
+                    incidente.Categoria,
+                    incidente.Prioridade,
+                    incidente.DataCriacao,
+                    incidente.DataEncerramento)
+                    
+                If Not resultado.Success Then
+                    registrosComErro += 1
+                    Console.WriteLine($"   ⚠️ Erro ao inserir incidente {incidente.Id}: {resultado.Mensagem}")
+                End If
+            Catch ex As Exception
+                registrosComErro += 1
+                Console.WriteLine($"   ⚠️ Exceção ao inserir incidente {incidente.Id}: {ex.Message}")
+            End Try
+        Next
+    End Sub
+    
+    ''' <summary>
+    ''' Reporta progresso para o callback
+    ''' </summary>
+    Private Sub ReportarProgresso(callbackProgresso As ProgressCallback, 
+                                 registrosProcessados As Integer, 
+                                 totalRegistros As Integer, 
+                                 inicioProcessamento As DateTime, 
+                                 registrosComErro As Integer,
+                                 Optional final As Boolean = False)
+        If callbackProgresso Is Nothing Then Return
+        
+        Try
+            Dim percentual As Integer = 0
+            Dim tempoEstimado As TimeSpan = TimeSpan.Zero
+            
+            If totalRegistros > 0 Then
+                percentual = CInt((registrosProcessados / totalRegistros) * 100)
+                
+                ' Calcular tempo estimado
+                If registrosProcessados > 0 Then
+                    Dim tempoDecorrido = DateTime.Now - inicioProcessamento
+                    Dim tempoPorRegistro = tempoDecorrido.TotalMilliseconds / registrosProcessados
+                    Dim registrosRestantes = totalRegistros - registrosProcessados
+                    tempoEstimado = TimeSpan.FromMilliseconds(tempoPorRegistro * registrosRestantes)
+                End If
+            End If
+            
+            Dim mensagem As String
+            If final Then
+                mensagem = $"✅ Processamento concluído: {registrosProcessados:N0} registros processados"
+                If registrosComErro > 0 Then
+                    mensagem += $", {registrosComErro:N0} com erro"
+                End If
+            Else
+                mensagem = $"📝 Processando: {registrosProcessados:N0} registros"
+                If totalRegistros > 0 Then
+                    mensagem += $" de {totalRegistros:N0} ({percentual}%)"
+                End If
+                If registrosComErro > 0 Then
+                    mensagem += $", {registrosComErro:N0} erros"
+                End If
+            End If
+            
+            Dim progressInfo As New ProgressInfo With {
+                .Percentual = percentual,
+                .Mensagem = mensagem,
+                .RegistrosProcessados = registrosProcessados,
+                .TotalRegistros = totalRegistros,
+                .TempoEstimado = tempoEstimado
+            }
+            
+            callbackProgresso(progressInfo)
+            
+        Catch ex As Exception
+            Console.WriteLine($"   ⚠️ Erro ao reportar progresso: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
     ''' Atualiza a tabela de dados históricos
     ''' </summary>
     Private Sub AtualizarDadosHistoricos()
@@ -903,4 +1121,27 @@ Public Class IncidenteTeste
     Public Property Prioridade As String
     Public Property DataCriacao As DateTime
     Public Property DataEncerramento As DateTime?
+End Class
+
+''' <summary>
+''' Classe para representar incidentes reais vindos da origem de dados
+''' </summary>
+Public Class IncidenteReal
+    Public Property Id As String
+    Public Property Assunto As String
+    Public Property Departamento As String
+    Public Property GrupoDirecionado As String
+    Public Property Categoria As String
+    Public Property Prioridade As String
+    Public Property DataCriacao As DateTime
+    Public Property DataEncerramento As DateTime?
+    
+    ' Campos adicionais que podem vir da origem
+    Public Property Descricao As String
+    Public Property Status As String
+    Public Property UsuarioCriador As String
+    Public Property UsuarioResponsavel As String
+    Public Property TempoResolucao As Integer? ' em minutos
+    Public Property Urgencia As String
+    Public Property Impacto As String
 End Class

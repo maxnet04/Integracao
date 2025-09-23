@@ -21,6 +21,7 @@ Public Class MainForm
     Private WithEvents btnCargaInicial As Button
     Private WithEvents btnCargaIncremental As Button
     Private WithEvents btnSincronizacaoInteligente As Button
+    Private WithEvents btnCargaDadosReais As Button
     Private WithEvents btnCriarVersaoTeste As Button
     Private WithEvents btnVerificarPortas As Button
     Private WithEvents btnMatarProcessos As Button
@@ -704,6 +705,7 @@ Public Class MainForm
         Me.btnCargaInicial = New System.Windows.Forms.Button()
         Me.btnCargaIncremental = New System.Windows.Forms.Button()
         Me.btnSincronizacaoInteligente = New System.Windows.Forms.Button()
+        Me.btnCargaDadosReais = New System.Windows.Forms.Button()
         Me.btnCriarVersaoTeste = New System.Windows.Forms.Button()
         Me.btnVerificarPortas = New System.Windows.Forms.Button()
         Me.btnMatarProcessos = New System.Windows.Forms.Button()
@@ -748,7 +750,7 @@ Public Class MainForm
         Me.lblStatus.Font = New System.Drawing.Font("Segoe UI", 10.0!, System.Drawing.FontStyle.Bold)
         Me.lblStatus.Location = New System.Drawing.Point(26, 66)
         Me.lblStatus.Name = "lblStatus"
-        Me.lblStatus.Size = New System.Drawing.Size(760, 25)
+        Me.lblStatus.Size = New System.Drawing.Size(510, 25)
         Me.lblStatus.TabIndex = 0
         Me.lblStatus.Text = "Sistema pronto"
         '
@@ -756,7 +758,7 @@ Public Class MainForm
         '
         Me.progressBar.Location = New System.Drawing.Point(20, 85)
         Me.progressBar.Name = "progressBar"
-        Me.progressBar.Size = New System.Drawing.Size(760, 25)
+        Me.progressBar.Size = New System.Drawing.Size(414, 25)
         Me.progressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous
         Me.progressBar.TabIndex = 1
         '
@@ -797,6 +799,17 @@ Public Class MainForm
         Me.btnSincronizacaoInteligente.TabIndex = 5
         Me.btnSincronizacaoInteligente.Text = "Sincronização Inteligente"
         Me.btnSincronizacaoInteligente.UseVisualStyleBackColor = False
+        '
+        'btnCargaDadosReais
+        '
+        Me.btnCargaDadosReais.BackColor = System.Drawing.Color.LightBlue
+        Me.btnCargaDadosReais.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.btnCargaDadosReais.Location = New System.Drawing.Point(642, 65)
+        Me.btnCargaDadosReais.Name = "btnCargaDadosReais"
+        Me.btnCargaDadosReais.Size = New System.Drawing.Size(150, 35)
+        Me.btnCargaDadosReais.TabIndex = 6
+        Me.btnCargaDadosReais.Text = "Carga Dados Reais"
+        Me.btnCargaDadosReais.UseVisualStyleBackColor = False
         '
         'btnCriarVersaoTeste
         '
@@ -992,7 +1005,7 @@ Public Class MainForm
         'btnFormularioIntegracao
         '
         Me.btnFormularioIntegracao.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
-        Me.btnFormularioIntegracao.Location = New System.Drawing.Point(440, 85)
+        Me.btnFormularioIntegracao.Location = New System.Drawing.Point(400, 54)
         Me.btnFormularioIntegracao.Name = "btnFormularioIntegracao"
         Me.btnFormularioIntegracao.Size = New System.Drawing.Size(220, 25)
         Me.btnFormularioIntegracao.TabIndex = 23
@@ -1069,48 +1082,47 @@ Public Class MainForm
         '
         'StatusStrip1
         '
-        Me.StatusStrip1.ImageScalingSize = New System.Drawing.Size(16, 16)
-        Me.StatusStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ts1, Me.ts2, Me.ts3, Me.ts4, Me.tsp1})
-        Me.StatusStrip1.Location = New System.Drawing.Point(0, 617)
-        Me.StatusStrip1.Name = "StatusStrip1"
         Me.StatusStrip1.AutoSize = False
-        Me.StatusStrip1.SizingGrip = False
-        Me.StatusStrip1.MinimumSize = New System.Drawing.Size(0, 38)
+        Me.StatusStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ts1, Me.ts2, Me.ts3, Me.ts4, Me.tsp1})
+        Me.StatusStrip1.Location = New System.Drawing.Point(0, 618)
         Me.StatusStrip1.MaximumSize = New System.Drawing.Size(0, 38)
+        Me.StatusStrip1.MinimumSize = New System.Drawing.Size(0, 38)
+        Me.StatusStrip1.Name = "StatusStrip1"
         Me.StatusStrip1.Size = New System.Drawing.Size(1165, 38)
+        Me.StatusStrip1.SizingGrip = False
         Me.StatusStrip1.TabIndex = 28
         Me.StatusStrip1.Text = "StatusStrip1"
         '
         'ts1
         '
         Me.ts1.Name = "ts1"
-        Me.ts1.Size = New System.Drawing.Size(85, 30)
+        Me.ts1.Size = New System.Drawing.Size(85, 29)
         Me.ts1.Text = "Agenda"
         '
         'ts2
         '
         Me.ts2.AutoSize = False
         Me.ts2.Name = "ts2"
-        Me.ts2.Size = New System.Drawing.Size(94, 30)
+        Me.ts2.Size = New System.Drawing.Size(94, 29)
         Me.ts2.Text = "BAckend"
         '
         'ts3
         '
         Me.ts3.AutoSize = False
         Me.ts3.Name = "ts3"
-        Me.ts3.Size = New System.Drawing.Size(96, 30)
+        Me.ts3.Size = New System.Drawing.Size(96, 29)
         Me.ts3.Text = "Frontend"
         '
         'ts4
         '
         Me.ts4.Name = "ts4"
-        Me.ts4.Size = New System.Drawing.Size(130, 30)
+        Me.ts4.Size = New System.Drawing.Size(130, 29)
         Me.ts4.Text = "Tempo: 1999"
         '
         'tsp1
         '
         Me.tsp1.Name = "tsp1"
-        Me.tsp1.Size = New System.Drawing.Size(100, 18)
+        Me.tsp1.Size = New System.Drawing.Size(100, 28)
         '
         'MainForm
         '
@@ -1128,6 +1140,7 @@ Public Class MainForm
         Me.Controls.Add(Me.btnCargaInicial)
         Me.Controls.Add(Me.btnCargaIncremental)
         Me.Controls.Add(Me.btnSincronizacaoInteligente)
+        Me.Controls.Add(Me.btnCargaDadosReais)
         Me.Controls.Add(Me.btnCriarVersaoTeste)
         Me.Controls.Add(Me.btnVerificarPortas)
         Me.Controls.Add(Me.btnMatarProcessos)
@@ -1995,6 +2008,48 @@ Public Class MainForm
     End Sub
 
     ''' <summary>
+    ''' Evento de clique no botão Carga Dados Reais
+    ''' </summary>
+    Private Async Sub btnCargaDadosReais_Click(sender As Object, e As EventArgs) Handles btnCargaDadosReais.Click
+        Try
+            btnCargaDadosReais.Enabled = False
+            UpdateStatus("Preparando carga de dados reais...")
+
+            ' Executar em thread separada para não bloquear a UI
+            Dim sucesso = Await Task.Run(Function()
+                Try
+                    ' Aqui você deve implementar a função que busca os dados da origem
+                    ' Exemplo de como usar:
+                    sincronizador.RealizarCargaInicialDadosReais(
+                        Function() ObterDadosDaOrigem(), ' Sua função para buscar dados
+                        AddressOf OnProgressoAtualizado, ' Callback de progresso
+                        0 ' Total de registros (0 = detectar automaticamente)
+                    )
+                    Return True
+                Catch ex As Exception
+                    Console.WriteLine($"❌ Erro na carga de dados reais: {ex.Message}")
+                    Return False
+                End Try
+            End Function)
+
+            If sucesso Then
+                UpdateStatus("Carga de dados reais concluída!")
+                MessageBox.Show("Carga de dados reais concluída com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                AtualizarInfoUltimaSincronizacao()
+            Else
+                UpdateStatus("Erro na carga de dados reais")
+                MessageBox.Show("Erro na carga de dados reais. Verifique os logs para mais detalhes.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+
+        Catch ex As Exception
+            UpdateStatus("Erro na carga de dados reais")
+            MessageBox.Show($"Erro na carga de dados reais: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnCargaDadosReais.Enabled = True
+        End Try
+    End Sub
+
+    ''' <summary>
     ''' Evento de clique no botão Verificar Portas (APENAS verifica, SEM matar processos)
     ''' </summary>
     Private Sub btnVerificarPortas_Click(sender As Object, e As EventArgs) Handles btnVerificarPortas.Click
@@ -2096,6 +2151,91 @@ Public Class MainForm
             lblStatus.Text = message
         End If
     End Sub
+
+    ''' <summary>
+    ''' Callback para atualização de progresso da carga de dados reais
+    ''' </summary>
+    Private Sub OnProgressoAtualizado(progress As ProgressInfo)
+        Try
+            If Me.InvokeRequired Then
+                Me.Invoke(Sub() OnProgressoAtualizado(progress))
+                Return
+            End If
+
+            ' Atualizar progress bar
+            UpdateProgress(progress.Percentual, progress.Mensagem)
+
+            ' Log detalhado no console
+            Console.WriteLine($"📊 Progresso: {progress.Percentual}% - {progress.Mensagem}")
+            If progress.TempoEstimado > TimeSpan.Zero Then
+                Console.WriteLine($"   ⏱️ Tempo estimado restante: {progress.TempoEstimado:hh\:mm\:ss}")
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"⚠️ Erro ao atualizar progresso: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Função de exemplo para obter dados da origem
+    ''' VOCÊ DEVE IMPLEMENTAR ESTA FUNÇÃO COM SUA LÓGICA DE BUSCA REAL
+    ''' </summary>
+    Private Function ObterDadosDaOrigem() As IEnumerable(Of IncidenteReal)
+        ' EXEMPLO: Aqui você implementaria sua lógica de busca real
+        ' Por exemplo:
+        ' - Conectar ao banco de dados externo
+        ' - Executar query SQL para buscar incidentes dos últimos 3 anos
+        ' - Retornar IEnumerable(Of IncidenteReal)
+        
+        Console.WriteLine("📡 Obtendo dados da origem...")
+        Console.WriteLine("⚠️ ATENÇÃO: Esta é uma função de exemplo!")
+        Console.WriteLine("💡 Implemente sua lógica de busca real aqui")
+        
+        ' Exemplo de retorno vazio (você deve substituir por sua implementação)
+        Return New List(Of IncidenteReal)()
+        
+        ' EXEMPLO DE IMPLEMENTAÇÃO (descomente e adapte conforme necessário):
+        'Try
+        '    Dim dados As New List(Of IncidenteReal)
+        '    
+        '    ' Exemplo de conexão com banco externo
+        '    Using conexao As New SqlConnection("sua_connection_string")
+        '        conexao.Open()
+        '        
+        '        Dim query As String = "
+        '            SELECT 
+        '                id, assunto, departamento, grupo_direcionado, 
+        '                categoria, prioridade, data_criacao, data_encerramento
+        '            FROM incidentes 
+        '            WHERE data_criacao >= DATEADD(year, -3, GETDATE())
+        '            ORDER BY data_criacao"
+        '        
+        '        Using cmd As New SqlCommand(query, conexao)
+        '            Using reader As SqlDataReader = cmd.ExecuteReader()
+        '                While reader.Read()
+        '                    dados.Add(New IncidenteReal With {
+        '                        .Id = reader("id").ToString(),
+        '                        .Assunto = reader("assunto").ToString(),
+        '                        .Departamento = reader("departamento").ToString(),
+        '                        .GrupoDirecionado = reader("grupo_direcionado").ToString(),
+        '                        .Categoria = reader("categoria").ToString(),
+        '                        .Prioridade = reader("prioridade").ToString(),
+        '                        .DataCriacao = Convert.ToDateTime(reader("data_criacao")),
+        '                        .DataEncerramento = If(IsDBNull(reader("data_encerramento")), Nothing, Convert.ToDateTime(reader("data_encerramento")))
+        '                    })
+        '                End While
+        '            End Using
+        '        End Using
+        '    End Using
+        '    
+        '    Console.WriteLine($"✅ {dados.Count:N0} registros obtidos da origem")
+        '    Return dados
+        '    
+        'Catch ex As Exception
+        '    Console.WriteLine($"❌ Erro ao obter dados da origem: {ex.Message}")
+        '    Throw
+        'End Try
+    End Function
 
     ''' <summary>
     ''' Atualiza ambos os progress bars (formulário e StatusStrip) simultaneamente
